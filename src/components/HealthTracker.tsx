@@ -5,6 +5,12 @@ type HealthTrackerProps = {
   campaignId: string;
 };
 
+type Character = {
+  id: string;
+  name: string;
+  maxHp: number;
+};
+
 type Combatant = {
   id: string;
   name: string;
@@ -14,20 +20,46 @@ type Combatant = {
   conditions: string[];
 };
 
-const KEY = (id: string) => `dnd_health_${id}`;
+const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
+const CHAR_KEY = 'dnd_characters'; // same key CharacterLibrary uses
 
 export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [combatants, setCombatants] = useState<Combatant[]>([]);
+  const [library, setLibrary] = useState<Character[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
 
-  /* ---- load / save ---- */
+  /* ---- load health tracker ---- */
   useEffect(() => {
-    const raw = localStorage.getItem(KEY(campaignId));
+    const raw = localStorage.getItem(HEALTH_KEY(campaignId));
     if (raw) setCombatants(JSON.parse(raw));
   }, [campaignId]);
 
   useEffect(() => {
-    localStorage.setItem(KEY(campaignId), JSON.stringify(combatants));
+    localStorage.setItem(HEALTH_KEY(campaignId), JSON.stringify(combatants));
   }, [combatants, campaignId]);
+
+  /* ---- load character library ---- */
+  useEffect(() => {
+    const raw = localStorage.getItem(CHAR_KEY);
+    if (raw) setLibrary(JSON.parse(raw));
+  }, []);
+
+  /* ---- add from library ---- */
+  const addFromLibrary = (c: Character) => {
+    const exists = combatants.some((x) => x.name === c.name);
+    if (exists) return; // avoid dupes by name
+    setCombatants((list) => [
+      ...list,
+      {
+        id: crypto.randomUUID(),
+        name: c.name,
+        maxHp: c.maxHp,
+        currentHp: c.maxHp,
+        tempHp: 0,
+        conditions: [],
+      },
+    ]);
+  };
 
   /* ---- manual add ---- */
   const [adding, setAdding] = useState(false);
@@ -100,7 +132,32 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   /* ---- render ---- */
   return (
     <div className="space-y-4">
-      {/* ---- manual add bar ---- */}
+      {/* ---- library quick-add ---- */}
+      {library.length > 0 && (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-400">Add from Library</span>
+            <button onClick={() => setShowAdd((s) => !s)} className="text-gray-400 hover:text-white">
+              {showAdd ? <X size={16} /> : <Plus size={16} />}
+            </button>
+          </div>
+          {showAdd && (
+            <div className="flex flex-wrap gap-2">
+              {library.map((c) => (
+                <div key={c.id} className="bg-slate-700 rounded px-3 py-2 flex items-center gap-2 text-sm">
+                  <span className="text-white">{c.name}</span>
+                  <span className="text-gray-400">({c.maxHp} HP)</span>
+                  <button onClick={() => addFromLibrary(c)} className="text-green-400 hover:text-green-300">
+                    <Plus size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- manual add ---- */}
       {!adding ? (
         <button
           onClick={() => setAdding(true)}
@@ -129,9 +186,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
       )}
 
       {/* ---- list ---- */}
-      {combatants.length === 0 && !adding && (
-        <p className="text-gray-400 text-center py-8">No characters added yet.</p>
-      )}
+      {combatants.length === 0 && !adding && <p className="text-gray-400 text-center py-8">No characters in tracker.</p>}
 
       {combatants.map((c) => (
         <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -162,11 +217,9 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* damage / heal */}
               <button onClick={() => applyDamage(c.id, 5)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs">-5</button>
               <button onClick={() => applyHeal(c.id, 5)} className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">+5</button>
 
-              {/* temp HP */}
               <input
                 type="number"
                 value={c.tempHp || ''}
