@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Swords, Settings, UserPlus, Trash2 } from 'lucide-react';
+import { Plus, Swords, UserPlus, Trash2 } from 'lucide-react';
 import { useUser } from '../lib/UserContext';
 import { multiplayerStorage, type MultiplayerCampaign } from '../lib/multiplayerStorage';
 import { JoinCampaignModal } from './JoinCampaignModal';
@@ -20,14 +20,12 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
   }, []);
 
   const loadCampaigns = () => {
-    if (user?.id) {
-      setCampaigns(multiplayerStorage.getCampaignsForUser(user.id));
-    }
+    if (user?.id) setCampaigns(multiplayerStorage.getCampaignsForUser(user.id));
   };
 
   const createCampaign = () => {
     if (!newCampaignName.trim() || !user?.id) return;
-    multiplayerStorage.addCampaign(newCampaignName, user.id);
+    multiplayerStorage.addCampaign(newCampaignName.trim(), user.id);
     setNewCampaignName('');
     setShowInput(false);
     loadCampaigns();
@@ -48,7 +46,7 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
         </h1>
         <div className="flex gap-2">
           <button
-            onClick={() => setShowInput(!showInput)}
+            onClick={() => setShowInput((s) => !s)}
             className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
           >
             <Plus size={20} /> New Campaign
@@ -100,25 +98,23 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
             <p className="text-gray-400 text-lg">No campaigns yet. Create or join one to get started!</p>
           </div>
         ) : (
-          campaigns.map((campaign) => (
+          campaigns.map((c) => (
             <div
-              key={campaign.id}
+              key={c.id}
               className="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:border-red-600 transition-colors"
             >
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() =>
-                    onSelectCampaign(campaign.id, campaign.name, campaign.joinCode || '')
-                  }
+                  onClick={() => onSelectCampaign(c.id, c.name, c.joinCode || '')}
                   className="flex-1 text-left"
                 >
-                  <h3 className="text-2xl font-bold text-white mb-2">{campaign.name}</h3>
+                  <h3 className="text-2xl font-bold text-white mb-2">{c.name}</h3>
                   <p className="text-gray-400 text-sm">
-                    Created {new Date(campaign.createdAt).toLocaleDateString()}
+                    Created {new Date(c.createdAt).toLocaleDateString()}
                   </p>
                 </button>
                 <button
-                  onClick={() => deleteCampaign(campaign.id)}
+                  onClick={() => deleteCampaign(c.id)}
                   className="text-red-500 hover:text-red-400 transition-colors p-2"
                   aria-label="Delete campaign"
                 >
@@ -133,8 +129,8 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
       {showJoinModal && (
         <JoinCampaignModal
           onClose={() => setShowJoinModal(false)}
-          onJoin={(campaign) => {
-            onSelectCampaign(campaign.id, campaign.name, campaign.joinCode || '');
+          onJoin={(c) => {
+            onSelectCampaign(c.id, c.name, c.joinCode || '');
             setShowJoinModal(false);
           }}
         />
