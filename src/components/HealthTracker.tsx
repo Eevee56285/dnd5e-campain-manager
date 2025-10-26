@@ -68,12 +68,12 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setEditing(null);
   };
 
-  /* ---------- damage / heal / temp ---------- */
+  /* ---------- damage / heal (allows negative down to -max) ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
       l.map((c) =>
         c.id === id
-          ? { ...c, currentHp: Math.max(0, Math.min(c.maxHp, c.currentHp + amount)) }
+          ? { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) } // ← negative cap
           : c
       )
     );
@@ -82,6 +82,10 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setCombatants((l) => l.map((c) => (c.id === id ? { ...c, tempHp: n } : c)));
 
   const remove = (id: string) => setCombatants((l) => l.filter((c) => c.id !== id));
+
+  /* ---------- bar colour ---------- */
+  const barColour = (pct: number) =>
+    pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
 
   /* ---------- render ---------- */
   return (
@@ -143,8 +147,8 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
       {combatants.length === 0 && !adding && <p className="text-gray-400 text-center py-8">No characters in tracker.</p>}
 
       {combatants.map((c) => {
-        const pct = Math.max(0, Math.min(100, Math.round((c.currentHp / c.maxHp) * 100)));
-        const barColor = pct > 50 ? 'bg-green-500' : pct > 25 ? 'bg-yellow-500' : 'bg-red-500';
+        const pct = Math.max(0, Math.min(100, Math.round(((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100)));
+        const barColor = barColour(pct);
         return (
           <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
@@ -152,37 +156,44 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
               <button onClick={() => remove(c.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16} /></button>
             </div>
 
-            {/*  HP bar  */}
-            <div className="w-full bg-slate-700 rounded-full h-4 overflow-hidden">
-              <div className={`h-4 ${barColor}`} style={{ width: `${pct}%` }} />
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className={c.currentHp <= 0 ? 'text-red-400' : 'text-gray-300'}>{c.currentHp} / {c.maxHp} HP</span>
-              {c.tempHp > 0 && <span className="text-blue-400">+{c.tempHp} temp</span>}
+            {/*  HP bar with buttons on the right  */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-slate-700 rounded-full h-6 overflow-hidden relative">
+                <div
+                  className={`h-6 ${barColor} transition-all duration-300 ease-out`}
+                  style={{ width: `${Math.max(0, Math.min(100, ((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100)}%` }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-semibold">
+                  {c.currentHp} / {c.maxHp} HP
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button onClick={() => apply(c.id, -1)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">-1</button>
+                <button onClick={() => apply(c.id, 1)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">+1</button>
+              </div>
             </div>
 
-            {/*  controls  */}
-            <div className="flex items-center gap-2 mt-2">
+            {c.tempHp > 0 && <div className="text-blue-400 text-sm">+{c.tempHp} temp</div>}
+
+            {/*  any-amount + edit + temp  */}
+            <div className="flex items-center gap-2">
               {editing === c.id ? (
                 <>
                   <input
                     value={hpEdit}
                     onChange={(e) => setHpEdit(e.target.value)}
-                    className="w-16 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-center text-sm"
+                    className="w-20 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-sm"
                   />
                   <button onClick={() => saveEdit(c.id)} className="text-green-400"><Check size={14} /></button>
                   <button onClick={() => setEditing(null)} className="text-red-400"><X size={14} /></button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => apply(c.id, -1)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs">-1</button>
-                  <button onClick={() => apply(c.id, 1)} className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">+1</button>
-
-                  {/*  any-amount input  */}
                   <input
                     type="number"
-                    placeholder="#"
-                    className="w-14 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-center text-xs"
+                    placeholder="Any #"
+                    className="w-20 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-sm"
                     onKeyDown={(e) => {
                       const val = parseInt((e.target as HTMLInputElement).value);
                       if (Number.isNaN(val)) return;
@@ -192,15 +203,13 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
                       }
                     }}
                   />
-
                   <button onClick={() => startEdit(c)} className="text-gray-400 hover:text-white"><Edit3 size={14} /></button>
-
                   <input
                     type="number"
                     value={c.tempHp || ''}
                     onChange={(e) => setTemp(c.id, parseInt(e.target.value) || 0)}
                     placeholder="Temp"
-                    className="w-16 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-center text-xs"
+                    className="w-20 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-sm"
                   />
                 </>
               )}
