@@ -14,7 +14,7 @@ type RollResult = {
   subtotal: number;
 };
 
-export default function EnhancedDiceRoller() {
+export function DiceRoller() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDice, setSelectedDice] = useState<Map<number, number>>(new Map([[20, 1]]));
   const [modifier, setModifier] = useState(0);
