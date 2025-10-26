@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Heart, Trash2, Edit3, Check, X } from 'lucide-react';
+import { Plus, Heart, Trash2, Edit3, Check, X, ChevronDown } from 'lucide-react';
 
 type HealthTrackerProps = { campaignId: string };
 type Character = { id: string; name: string; maxHp: number };
@@ -12,12 +12,34 @@ type Combatant = {
   conditions: string[];
 };
 
+/* ---------- D&D 5e conditions + emoji ---------- */
+const CONDITIONS = [
+  { name: 'Blinded', emoji: '🙈' },
+  { name: 'Charmed', emoji: '💕' },
+  { name: 'Deafened', emoji: '🦻' },
+  { name: 'Frightened', emoji: '😱' },
+  { name: 'Grappled', emoji: '🤼' },
+  { name: 'Incapacitated', emoji: '😵' },
+  { name: 'Invisible', emoji: '👻' },
+  { name: 'Paralyzed', emoji: '🧊' },
+  { name: 'Petrified', emoji: '🗿' },
+  { name: 'Poisoned', emoji: '🧪' },
+  { name: 'Prone', emoji: '🛌' },
+  { name: 'Restrained', emoji: '🔗' },
+  { name: 'Stunned', emoji: '⚡' },
+  { name: 'Unconscious (auto)', emoji: '😴' },
+  { name: 'Exhaustion', emoji: '😩' },
+];
+
+/* ---------- helpers ---------- */
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
 const CHAR_KEY   = 'dnd_characters';
 
-/*  bar width helper  */
 const barPct = (cur: number, max: number) =>
   Math.max(0, Math.min(100, ((cur + max) / (max * 2)) * 100));
+
+const barColour = (pct: number) =>
+  pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
 
 export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [combatants, setCombatants] = useState<Combatant[]>([]);
@@ -28,6 +50,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [newMax, setNewMax]         = useState('');
   const [editing, setEditing]       = useState<string | null>(null);
   const [hpEdit, setHpEdit]         = useState('');
+  const [dropdown, setDropdown]     = useState<string | null>(null);
 
   /* ---------- load ---------- */
   useEffect(() => {
@@ -84,13 +107,37 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
 
   const remove = (id: string) => setCombatants((l) => l.filter((c) => c.id !== id));
 
-  /* ---------- bar colour ---------- */
-  const barColour = (pct: number) =>
-    pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
+  /* ---------- status badge ---------- */
+  const statusBadge = (c: Combatant) => {
+    if (c.currentHp <= -c.maxHp) return { text: 'Dead', color: 'bg-red-700' };
+    if (c.currentHp === 0) return { text: 'Unconscious', color: 'bg-gray-700' };
+    if (c.currentHp <= Math.floor(c.maxHp / 2)) return { text: 'Bloodied', color: 'bg-orange-600' };
+    return { text: 'Healthy', color: 'bg-green-700' };
+  };
+
+  /* ---------- condition add ---------- */
+  const addCondition = (id: string, cond: { name: string; emoji: string }) => {
+    setCombatants((l) =>
+      l.map((c) =>
+        c.id === id && !c.conditions.includes(cond.name)
+          ? { ...c, conditions: [...c.conditions, cond.name] }
+          : c
+      )
+    );
+    setDropdown(null);
+  };
+
+  const removeCondition = (id: string, name: string) =>
+    setCombatants((l) =>
+      l.map((c) =>
+        c.id === id ? { ...c, conditions: c.conditions.filter((x) => x !== name) } : c
+      )
+    );
 
   /* ---------- render ---------- */
   return (
     <div className="space-y-4">
+      {/* ----  library row  ---- */}
       {library.length > 0 && (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
@@ -115,6 +162,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
         </div>
       )}
 
+      {/* ----  manual add  ---- */}
       {!adding ? (
         <button
           onClick={() => setAdding(true)}
@@ -142,17 +190,22 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
         </div>
       )}
 
+      {/* ----  tracker cards  ---- */}
       {combatants.length === 0 && !adding && <p className="text-gray-400 text-center py-8">No characters in tracker.</p>}
 
       {combatants.map((c) => {
         const pct = barPct(c.currentHp, c.maxHp);
         const barColor = pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
+        const badge = statusBadge(c);
         return (
           <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-white font-bold">{c.name}</h3>
               <button onClick={() => remove(c.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16} /></button>
             </div>
+
+            {/*  status badge  */}
+            <div className={`inline-block px-2 py-1 rounded text-xs text-white ${badge.color}`}>{badge.text}</div>
 
             {/*  HP bar with buttons on the right  */}
             <div className="flex items-center gap-3">
@@ -174,6 +227,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
 
             {c.tempHp > 0 && <div className="text-blue-400 text-sm">+{c.tempHp} temp</div>}
 
+            {/*  any-amount + edit + temp  */}
             <div className="flex items-center gap-2">
               {editing === c.id ? (
                 <>
@@ -210,6 +264,50 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
                   />
                 </>
               )}
+            </div>
+
+            {/*  condition chips  */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {c.conditions.map((cond) => {
+                const emo = CONDITIONS.find((x) => x.name === cond)?.emoji || '❓';
+                return (
+                  <span
+                    key={cond}
+                    className="bg-slate-700 border border-slate-600 rounded-full px-2 py-1 text-xs text-white flex items-center gap-1 animate-fadeIn"
+                  >
+                    <span>{emo}</span>
+                    <span>{cond}</span>
+                    <button onClick={() => removeCondition(c.id, cond)} className="text-red-400 hover:text-red-300">
+                      <X size={12} />
+                    </button>
+                  </span>
+                );
+              })}
+
+              {/*  add condition dropdown  */}
+              <div className="relative">
+                <button
+                  onClick={() => setDropdown(dropdown === c.id ? null : c.id)}
+                  className="bg-slate-700 border border-slate-600 rounded-full px-2 py-1 text-xs text-white flex items-center gap-1 hover:bg-slate-600"
+                >
+                  <Plus size={12} />
+                  <ChevronDown size={12} />
+                </button>
+                {dropdown === c.id && (
+                  <div className="absolute left-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                    {CONDITIONS.map((cond) => (
+                      <button
+                        key={cond.name}
+                        onClick={() => addCondition(c.id, cond)}
+                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-700 flex items-center gap-2"
+                      >
+                        <span>{cond.emoji}</span>
+                        <span>{cond.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
