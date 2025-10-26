@@ -98,15 +98,13 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
           <Swords size={18} />
           Initiative Tracker
         </button>
+        {/*  >>>  HEALTH TRACKER ALWAYS AVAILABLE  <<<  */}
         <button
           onClick={() => setActiveTab('health')}
-          disabled={!battleActive}
           className={`px-4 py-2 font-medium transition-colors ${
             activeTab === 'health'
               ? 'text-red-600 border-b-2 border-red-600'
-              : battleActive
-              ? 'text-gray-400 hover:text-white'
-              : 'text-gray-600 cursor-not-allowed'
+              : 'text-gray-400 hover:text-white'
           }`}
         >
           Health Tracker
@@ -115,9 +113,11 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
 
       {activeTab === 'characters' && <CharacterLibrary />}
       {activeTab === 'initiative' && battleActive && <InitiativeTracker campaignId={campaignId} />}
-      {activeTab === 'health' && battleActive && <HealthTracker campaignId={campaignId} />}
+      {/*  >>>  HEALTH TRACKER RENDERED EVEN WHEN BATTLE IS NOT ACTIVE  <<<  */}
+      {activeTab === 'health' && <HealthTracker campaignId={campaignId} />}
 
-      {!battleActive && activeTab !== 'characters' && (
+      {/*  >>>  REMOVED THE "no battle" BLOCK FOR HEALTH  <<<  */}
+      {!battleActive && activeTab === 'initiative' && (
         <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-12 text-center">
           <Swords size={48} className="mx-auto mb-4 text-slate-600" />
           <p className="text-gray-400 text-lg">Start Initiative to begin tracking combat!</p>
