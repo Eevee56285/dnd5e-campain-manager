@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Heart, Trash2, Edit3, Check, X } from 'lucide-react';
 
 type HealthTrackerProps = { campaignId: string };
-
 type Character = { id: string; name: string; maxHp: number };
-
 type Combatant = {
   id: string;
   name: string;
@@ -16,6 +14,10 @@ type Combatant = {
 
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
 const CHAR_KEY   = 'dnd_characters';
+
+/*  bar width helper  */
+const barPct = (cur: number, max: number) =>
+  Math.max(0, Math.min(100, ((cur + max) / (max * 2)) * 100));
 
 export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [combatants, setCombatants] = useState<Combatant[]>([]);
@@ -67,7 +69,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setEditing(null);
   };
 
-  /* ---------- damage / heal (negative allowed down to -max) ---------- */
+  /* ---------- damage / heal (negative allowed to -max) ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
       l.map((c) =>
@@ -89,7 +91,6 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   /* ---------- render ---------- */
   return (
     <div className="space-y-4">
-      {/* ----  library row  ---- */}
       {library.length > 0 && (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
@@ -114,7 +115,6 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
         </div>
       )}
 
-      {/* ----  manual add  ---- */}
       {!adding ? (
         <button
           onClick={() => setAdding(true)}
@@ -142,11 +142,10 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
         </div>
       )}
 
-      {/* ----  tracker cards  ---- */}
       {combatants.length === 0 && !adding && <p className="text-gray-400 text-center py-8">No characters in tracker.</p>}
 
       {combatants.map((c) => {
-        const pct = Math.max(0, Math.min(100, ((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100));
+        const pct = barPct(c.currentHp, c.maxHp);
         const barColor = pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
         return (
           <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
@@ -160,7 +159,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
               <div className="flex-1 bg-slate-700 rounded-full h-6 overflow-hidden relative">
                 <div
                   className={`h-6 ${barColor} transition-all duration-300 ease-out`}
-                  style={{ width: `${Math.max(0, Math.min(100, ((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100)}%` }}
+                  style={{ width: `${pct}%` }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-semibold">
                   {c.currentHp} / {c.maxHp} HP
@@ -175,7 +174,6 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
 
             {c.tempHp > 0 && <div className="text-blue-400 text-sm">+{c.tempHp} temp</div>}
 
-            {/*  any-amount + edit + temp  */}
             <div className="flex items-center gap-2">
               {editing === c.id ? (
                 <>
