@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Heart, Trash2, Edit3, Check, X, ChevronDown } from 'lucide-react';
+import { Plus, Heart, Trash2, Edit3, Check, X, ChevronDown, Upload, Download } from 'lucide-react';
 
 type HealthTrackerProps = { campaignId: string };
 type Character = { id: string; name: string; maxHp: number };
@@ -27,11 +27,9 @@ const CONDITIONS = [
   { name: 'Prone', emoji: '🛌' },
   { name: 'Restrained', emoji: '🔗' },
   { name: 'Stunned', emoji: '⚡' },
-  { name: 'Unconscious (auto)', emoji: '😴' },
   { name: 'Exhaustion', emoji: '😩' },
 ];
 
-/* ---------- helpers ---------- */
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
 const CHAR_KEY   = 'dnd_characters';
 
@@ -64,6 +62,40 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     localStorage.setItem(HEALTH_KEY(campaignId), JSON.stringify(combatants));
   }, [combatants, campaignId]);
 
+  /* ---------- IMPORT / EXPORT ---------- */
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(combatants, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `health_${campaignId}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (file: File, wipeFirst = false) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string) as Combatant[];
+        if (!Array.isArray(imported)) throw new Error('Not an array');
+        if (wipeFirst) setCombatants(imported);
+        else
+          setCombatants((prev) => {
+            const existing = new Set(prev.map((c) => c.name));
+            const merged   = [...prev];
+            imported.forEach((c) => {
+              if (!existing.has(c.name)) merged.push({ ...c, id: crypto.randomUUID() });
+            });
+            return merged;
+          });
+      } catch (err) {
+        alert('Invalid JSON file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   /* ---------- library add ---------- */
   const addFromLibrary = (c: Character) => {
     if (combatants.some((x) => x.name === c.name)) return;
@@ -92,7 +124,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setEditing(null);
   };
 
-  /* ---------- damage / heal (negative allowed to -max) ---------- */
+  /* ---------- damage / heal ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
       l.map((c) =>
@@ -137,6 +169,20 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   /* ---------- render ---------- */
   return (
     <div className="space-y-4">
+      {/* ----  IMPORT / EXPORT bar  ---- */}
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 flex items-center justify-between">
+        <span className="text-sm text-gray-400">Campaign Health Tracker</span>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-white text-xs cursor-pointer">
+            <input type="file" accept=".json" className="hidden" onChange={(e) => importData(e.target.files![0], false)} />
+            <Upload size={14} /> Import
+          </label>
+          <button onClick={exportData} className="flex items-center gap-2 text-white text-xs hover:text-gray-300">
+            <Download size={14} /> Export
+          </button>
+        </div>
+      </div>
+
       {/* ----  library row  ---- */}
       {library.length > 0 && (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-3">
@@ -273,7 +319,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
                 return (
                   <span
                     key={cond}
-                    className="bg-slate-700 border border-slate-600 rounded-full px-2 py-1 text-xs text-white flex items-center gap-1 animate-fadeIn"
+                    className="bg-slate-700 border border-slate-600 rounded-full px-2 py-1 text-xs text-white flex items-center gap-1"
                   >
                     <span>{emo}</span>
                     <span>{cond}</span>
