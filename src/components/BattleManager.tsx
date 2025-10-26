@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { storage, type BattleSession } from '../lib/storage';
 import { ArrowLeft, Swords, BookOpen } from 'lucide-react';
 import { InitiativeTracker } from './InitiativeTracker';
 import { HealthTracker } from './HealthTracker';
@@ -9,6 +8,14 @@ type BattleManagerProps = {
   campaignId: string;
   campaignName: string;
   onBack: () => void;
+};
+
+type BattleSession = {
+  campaignId: string;
+  isActive: boolean;
+  combatants: any[];
+  round: number;
+  currentTurn: number;
 };
 
 export function BattleManager({ campaignId, campaignName, onBack }: BattleManagerProps) {
