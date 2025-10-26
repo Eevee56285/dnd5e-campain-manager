@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Swords, BookOpen, Heart } from 'lucide-react';
+import { storage, type BattleSession } from '../lib/storage';
+import { ArrowLeft, Swords, BookOpen } from 'lucide-react';
 import { InitiativeTracker } from './InitiativeTracker';
 import { HealthTracker } from './HealthTracker';
 import { CharacterLibrary } from './CharacterLibrary';
@@ -10,34 +11,13 @@ type BattleManagerProps = {
   onBack: () => void;
 };
 
-type BattleSession = {
-  campaignId: string;
-  isActive: boolean;
-  combatants: any[];
-  round: number;
-  currentTurn: number;
-};
-
-/* ----------  single-campaign localStorage helpers  ---------- */
-const BATTLE_KEY = (id: string) => `dnd_battle_${id}`;
-
-const getBattle = (id: string): BattleSession | null =>
-  JSON.parse(localStorage.getItem(BATTLE_KEY(id)) || 'null');
-
-const saveBattle = (id: string, s: BattleSession) =>
-  localStorage.setItem(BATTLE_KEY(id), JSON.stringify(s));
-
-const clearBattle = (id: string) =>
-  localStorage.removeItem(BATTLE_KEY(id));
-
 export function BattleManager({ campaignId, campaignName, onBack }: BattleManagerProps) {
   const [battleActive, setBattleActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'characters' | 'initiative' | 'health'>('characters');
 
-  /* load persisted battle on mount */
   useEffect(() => {
-    const session = getBattle(campaignId);
-    if (session && session.isActive) {
+    const session = storage.getBattleSession();
+    if (session && session.campaignId === campaignId && session.isActive) {
       setBattleActive(true);
       setActiveTab('initiative');
     }
@@ -51,14 +31,14 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
       round: 1,
       currentTurn: 0,
     };
-    saveBattle(campaignId, session);
+    storage.saveBattleSession(session);
     setBattleActive(true);
     setActiveTab('initiative');
   };
 
   const endBattle = () => {
     if (!confirm('End this battle? All initiative and combat data will be cleared.')) return;
-    clearBattle(campaignId);
+    storage.clearBattleSession();
     setBattleActive(false);
     setActiveTab('characters');
   };
@@ -74,24 +54,22 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
           Back to Campaigns
         </button>
         <h2 className="text-2xl font-bold text-white">{campaignName}</h2>
-        <div className="flex items-center gap-3">
-          {!battleActive ? (
-            <button
-              onClick={startInitiative}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
-            >
-              <Swords size={20} />
-              Start Initiative
-            </button>
-          ) : (
-            <button
-              onClick={endBattle}
-              className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded transition-colors"
-            >
-              End Battle
-            </button>
-          )}
-        </div>
+        {!battleActive ? (
+          <button
+            onClick={startInitiative}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+          >
+            <Swords size={20} />
+            Start Initiative
+          </button>
+        ) : (
+          <button
+            onClick={endBattle}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded transition-colors"
+          >
+            End Battle
+          </button>
+        )}
       </div>
 
       <div className="mb-6 flex gap-2 border-b border-slate-700">
@@ -122,22 +100,24 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
         </button>
         <button
           onClick={() => setActiveTab('health')}
-          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
+          disabled={!battleActive}
+          className={`px-4 py-2 font-medium transition-colors ${
             activeTab === 'health'
               ? 'text-red-600 border-b-2 border-red-600'
-              : 'text-gray-400 hover:text-white'
+              : battleActive
+              ? 'text-gray-400 hover:text-white'
+              : 'text-gray-600 cursor-not-allowed'
           }`}
         >
-          <Heart size={18} />
           Health Tracker
         </button>
       </div>
 
       {activeTab === 'characters' && <CharacterLibrary />}
       {activeTab === 'initiative' && battleActive && <InitiativeTracker campaignId={campaignId} />}
-      {activeTab === 'health' && <HealthTracker campaignId={campaignId} />}
+      {activeTab === 'health' && battleActive && <HealthTracker campaignId={campaignId} />}
 
-      {!battleActive && activeTab === 'initiative' && (
+      {!battleActive && activeTab !== 'characters' && (
         <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-12 text-center">
           <Swords size={48} className="mx-auto mb-4 text-slate-600" />
           <p className="text-gray-400 text-lg">Start Initiative to begin tracking combat!</p>
