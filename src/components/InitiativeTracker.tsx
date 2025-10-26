@@ -77,12 +77,13 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const [newMax, setNewMax]         = useState('');
   const [newAc, setNewAc]           = useState('');
   const [newDex, setNewDex]         = useState('');
+  const [manualInit, setManualInit] = useState('');          // <- manual roll
   const [editing, setEditing]       = useState<string | null>(null);
   const [hpEdit, setHpEdit]         = useState('');
   const [dropdown, setDropdown]     = useState<string | null>(null);
   const [library, setLibrary]       = useState<LibraryCharacter[]>([]);
 
-  /* ---------- load library + initiative + active ---------- */
+  /* ---------- load ---------- */
   useEffect(() => {
     const libRaw = localStorage.getItem(CHAR_KEY);
     if (libRaw) setLibrary(JSON.parse(libRaw));
@@ -103,9 +104,6 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   /* ---------- library split ---------- */
   const players = library.filter((c) => c.type === 'player');
   const npcs    = library.filter((c) => c.type === 'npc');
-
-  /* ---------- roll ---------- */
-  const roll = (mod: number) => Math.floor(Math.random() * 20) + 1 + mod;
 
   /* ---------- add from SRD monster ---------- */
   const addMonster = (m: typeof SRD_MONSTERS[0]) => {
@@ -135,14 +133,14 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   };
 
   /* ---------- add from library (player / npc) ---------- */
-  const addFromLibrary = (c: LibraryCharacter) => {
+  const addFromLibrary = (c: LibraryCharacter, initRoll?: number) => {
     const newC: Combatant = {
       id: crypto.randomUUID(),
       name: c.name,
       maxHp: c.maxHp,
       currentHp: c.maxHp,
       ac: c.armorClass ?? 10,
-      initiative: roll(c.dexModifier ?? 0),
+      initiative: initRoll ?? roll(c.dexModifier ?? 0),
       dexMod: c.dexModifier ?? 0,
       type: c.type,
       speed: '30 ft.',
@@ -158,13 +156,14 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
     const max = parseInt(newMax) || 10;
     const ac = parseInt(newAc) || 10;
     const dex = parseInt(newDex) || 0;
+    const init = manualInit === '' ? roll(dex) : parseInt(manualInit) || 0;
     const newC: Combatant = {
       id: crypto.randomUUID(),
       name: newName.trim() || 'Unnamed',
       maxHp: max,
       currentHp: max,
       ac: ac,
-      initiative: roll(dex),
+      initiative: init,
       dexMod: dex,
       type: modal === 'player' ? 'player' : modal === 'npc' ? 'npc' : 'monster',
       speed: '30 ft.',
@@ -173,7 +172,8 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
       tempHp: 0,
     };
     setCombatants((prev) => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
-    setNewName(''); setNewMax(''); setNewAc(''); setNewDex('');
+    // reset
+    setNewName(''); setNewMax(''); setNewAc(''); setNewDex(''); setManualInit('');
     setModal('closed');
   };
 
@@ -372,17 +372,27 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                   {players.length === 0 && <p className="text-gray-400 text-sm">No players in library.</p>}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {players.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          addFromLibrary(c);
-                          setModal('closed');
-                        }}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg p-3 text-left transition"
-                      >
+                      <div key={c.id} className="bg-slate-700 border border-slate-600 rounded-lg p-3 text-left">
                         <div className="text-white font-semibold">{c.name}</div>
                         <div className="text-xs text-gray-400">HP {c.maxHp} · AC {c.armorClass ?? 10} · Init +{c.dexModifier ?? 0}</div>
-                      </button>
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            value={manualInit}
+                            onChange={(e) => setManualInit(e.target.value)}
+                            placeholder="Manual roll"
+                            className="w-full bg-slate-600 border border-slate-500 text-white rounded px-2 py-1 text-xs"
+                          />
+                          <button
+                            onClick={() => {
+                              addFromLibrary(c, manualInit === '' ? undefined : parseInt(manualInit) || 0);
+                              setModal('closed');
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <details className="text-sm text-gray-400">
@@ -394,7 +404,15 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                         <input type="number" value={newAc} onChange={(e) => setNewAc(e.target.value)} placeholder="AC" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                         <input type="number" value={newDex} onChange={(e) => setNewDex(e.target.value)} placeholder="Dex mod" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                       </div>
-                      <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={manualInit}
+                          onChange={(e) => setManualInit(e.target.value)}
+                          placeholder="Manual initiative"
+                          className="w-full bg-slate-600 border border-slate-500 text-white rounded px-2 py-1 text-sm"
+                        />
+                        <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      </div>
                     </div>
                   </details>
                 </>
@@ -406,17 +424,27 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                   {npcs.length === 0 && <p className="text-gray-400 text-sm">No NPCs in library.</p>}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {npcs.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          addFromLibrary(c);
-                          setModal('closed');
-                        }}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg p-3 text-left transition"
-                      >
+                      <div key={c.id} className="bg-slate-700 border border-slate-600 rounded-lg p-3 text-left">
                         <div className="text-white font-semibold">{c.name}</div>
                         <div className="text-xs text-gray-400">HP {c.maxHp} · AC {c.armorClass ?? 10} · Init +{c.dexModifier ?? 0}</div>
-                      </button>
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            value={manualInit}
+                            onChange={(e) => setManualInit(e.target.value)}
+                            placeholder="Manual roll"
+                            className="w-full bg-slate-600 border border-slate-500 text-white rounded px-2 py-1 text-xs"
+                          />
+                          <button
+                            onClick={() => {
+                              addFromLibrary(c, manualInit === '' ? undefined : parseInt(manualInit) || 0);
+                              setModal('closed');
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <details className="text-sm text-gray-400">
@@ -428,7 +456,15 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                         <input type="number" value={newAc} onChange={(e) => setNewAc(e.target.value)} placeholder="AC" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                         <input type="number" value={newDex} onChange={(e) => setNewDex(e.target.value)} placeholder="Dex mod" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                       </div>
-                      <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={manualInit}
+                          onChange={(e) => setManualInit(e.target.value)}
+                          placeholder="Manual initiative"
+                          className="w-full bg-slate-600 border border-slate-500 text-white rounded px-2 py-1 text-sm"
+                        />
+                        <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      </div>
                     </div>
                   </details>
                 </>
@@ -471,7 +507,15 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                         <input type="number" value={newAc} onChange={(e) => setNewAc(e.target.value)} placeholder="AC" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                         <input type="number" value={newDex} onChange={(e) => setNewDex(e.target.value)} placeholder="Dex mod" className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2" />
                       </div>
-                      <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={manualInit}
+                          onChange={(e) => setManualInit(e.target.value)}
+                          placeholder="Manual initiative"
+                          className="w-full bg-slate-600 border border-slate-500 text-white rounded px-2 py-1 text-sm"
+                        />
+                        <button onClick={addCustom} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Add Custom</button>
+                      </div>
                     </div>
                   </details>
                 </>
