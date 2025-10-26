@@ -36,17 +36,8 @@ type Combatant = {
   tempHp: number;
 };
 
-/* ---------- SRD monsters (trimmed) ---------- */
-const SRD_MONSTERS: Omit<Combatant, 'id' | 'currentHp' | 'initiative' | 'conditions' | 'tempHp'>[] = [
-  { name: 'Acolyte', maxHp: 9, ac: 10, dexMod: 0, type: 'monster', speed: '30 ft.', size: 'Medium', monsterType: 'humanoid', alignment: 'any alignment', cr: '1/4', senses: 'passive Perception 12', languages: 'Common', traits: ['Spellcasting'], actions: ['Club +2 (1d4)'] },
-  { name: 'Bandit', maxHp: 11, ac: 12, dexMod: 1, type: 'monster', speed: '30 ft.', size: 'Medium', monsterType: 'humanoid', alignment: 'any non-lawful', cr: '1/8', senses: 'passive Perception 10', languages: 'Common', actions: ['Scimitar +3 (1d6+1)'] },
-  { name: 'Wolf', maxHp: 11, ac: 13, dexMod: 2, type: 'monster', speed: '40 ft.', size: 'Medium', monsterType: 'beast', alignment: 'unaligned', cr: '1/4', senses: 'passive Perception 13, keen hearing/smell', languages: '-', traits: ['Pack Tactics', 'Keen Hearing/Smell'], actions: ['Bite +4 (2d4+2)'] },
-  { name: 'Goblin', maxHp: 7, ac: 15, dexMod: 2, type: 'monster', speed: '30 ft.', size: 'Small', monsterType: 'humanoid', alignment: 'neutral evil', cr: '1/4', senses: 'darkvision 60 ft.', languages: 'Common, Goblin', traits: ['Nimble Escape'], actions: ['Scimitar +4 (1d6+2)', 'Shortbow +4 (1d6+2)'] },
-  { name: 'Skeleton', maxHp: 13, ac: 13, dexMod: 2, type: 'monster', speed: '30 ft.', size: 'Medium', monsterType: 'undead', alignment: 'lawful evil', cr: '1/4', senses: 'darkvision 60 ft.', languages: 'understands Common but can\'t speak', traits: ['Damage Vulnerabilities: bludgeoning', 'Damage Immunities: poison', 'Condition Immunities: exhaustion, poisoned'], actions: ['Shortsword +4 (1d6+2)'] },
-  { name: 'Owlbear', maxHp: 59, ac: 13, dexMod: 1, type: 'monster', speed: '40 ft.', size: 'Large', monsterType: 'monstrosity', alignment: 'unaligned', cr: '3', senses: 'darkvision 60 ft.', languages: '-', traits: ['Keen Sight/Smell'], actions: ['Multiattack: 2 claws', 'Beak +7 (2d8+5)', 'Claws +7 (2d6+5)'] },
-  { name: 'Phase Spider', maxHp: 32, ac: 13, dexMod: 3, type: 'monster', speed: '30 ft., climb 30 ft.', size: 'Large', monsterType: 'monstrosity', alignment: 'unaligned', cr: '3', senses: 'darkvision 60 ft.', languages: '-', traits: ['Ethereal Jaunt', 'Spider Climb'], actions: ['Bite +5 (2d8+3 + poison)'] },
-  { name: 'Young White Dragon', maxHp: 133, ac: 17, dexMod: 0, type: 'monster', speed: '40 ft., fly 80 ft., swim 40 ft.', size: 'Large', monsterType: 'dragon', alignment: 'chaotic evil', cr: '6', senses: 'blindsight 30 ft., darkvision 120 ft.', languages: 'Common, Draconic', traits: ['Ice Walk', 'Multiattack'], actions: ['Bite +7 (2d10+4 + 1d8 cold)', 'Cold Breath (10d8 cold, DC 16)'] },
-];
+/* ---------- remote SRD monster list ---------- */
+const MONSTERS_URL = 'https://raw.githubusercontent.com/nick-aschenbach/dnd-data/refs/heads/main/data/monsters.json';
 
 /* ---------- helpers ---------- */
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
@@ -82,8 +73,10 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const [hpEdit, setHpEdit]         = useState('');
   const [dropdown, setDropdown]     = useState<string | null>(null);
   const [library, setLibrary]       = useState<LibraryCharacter[]>([]);
+  const [remoteMonsters, setRemote] = useState<Combatant[]>([]);
+  const [loading, setLoading]       = useState(false);
 
-  /* ---------- load ---------- */
+  /* ---------- load local library + initiative ---------- */
   useEffect(() => {
     const libRaw = localStorage.getItem(CHAR_KEY);
     if (libRaw) setLibrary(JSON.parse(libRaw));
@@ -105,29 +98,50 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const players = library.filter((c) => c.type === 'player');
   const npcs    = library.filter((c) => c.type === 'npc');
 
-  /* ---------- add from SRD monster ---------- */
-  const addMonster = (m: typeof SRD_MONSTERS[0]) => {
+  /* ---------- fetch remote monsters once when Monster tab opened ---------- */
+  useEffect(() => {
+    if (modal === 'monster' && remoteMonsters.length === 0 && !loading) {
+      setLoading(true);
+      fetch(MONSTERS_URL)
+        .then((r) => r.json())
+        .then((data: any[]) => {
+          const list: Combatant[] = data.slice(0, 200).map((m: any) => ({
+            name: m.name,
+            maxHp: m.hit_points,
+            currentHp: m.hit_points,
+            ac: m.armor_class,
+            initiative: 0, // rolled on add
+            dexMod: m.dexterity ? Math.floor((m.dexterity - 10) / 2) : 0,
+            type: 'monster',
+            speed: m.speed?.walk || '30 ft.',
+            size: m.size || 'Medium',
+            monsterType: m.type || 'beast',
+            alignment: m.alignment || 'unaligned',
+            cr: m.challenge_rating?.toString() || '-',
+            senses: Object.keys(m.senses || {}).join(', ') || 'passive Perception 10',
+            languages: m.languages || '-',
+            traits: m.special_abilities?.map((a: any) => a.name) || [],
+            actions: m.actions?.map((a: any) => a.name) || [],
+            legendary: m.legendary_actions?.map((a: any) => a.name) || [],
+            conditions: [],
+            tempHp: 0,
+          }));
+          setRemote(list);
+          setLoading(false);
+        })
+        .catch(() => {
+          setRemote([]);
+          setLoading(false);
+        });
+    }
+  }, [modal, remoteMonsters.length, loading]);
+
+  /* ---------- add from remote monster ---------- */
+  const addMonster = (m: Combatant) => {
     const newC: Combatant = {
+      ...m,
       id: crypto.randomUUID(),
-      name: m.name,
-      maxHp: m.maxHp,
-      currentHp: m.maxHp,
-      ac: m.ac,
-      initiative: roll(m.dexMod),
-      dexMod: m.dexMod,
-      type: 'monster',
-      speed: m.speed,
-      size: m.size,
-      monsterType: m.monsterType,
-      alignment: m.alignment,
-      cr: m.cr,
-      senses: m.senses,
-      languages: m.languages,
-      traits: m.traits,
-      actions: m.actions,
-      legendary: m.legendary,
-      conditions: [],
-      tempHp: 0,
+      initiative: manualInit === '' ? roll(m.dexMod) : parseInt(manualInit) || 0,
     };
     setCombatants((prev) => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
   };
@@ -140,7 +154,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
       maxHp: c.maxHp,
       currentHp: c.maxHp,
       ac: c.armorClass ?? 10,
-      initiative: initRoll ?? roll(c.dexModifier ?? 0),
+      initiative: initRoll ?? (manualInit === '' ? roll(c.dexModifier ?? 0) : parseInt(manualInit) || 0),
       dexMod: c.dexModifier ?? 0,
       type: c.type,
       speed: '30 ft.',
@@ -361,6 +375,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
             {/*  header  */}
             <div className="flex items-center justify-between p-4 border-b border-slate-700">
               <h3 className="text-xl font-bold text-white">Add {modal === 'monster' ? 'Monster' : modal === 'player' ? 'Player' : 'NPC'}</h3>
+              <button onClick={() => setModal('closed')} className="text-gray-400 hover:text-white"><X size={20} /></button>
             </div>
 
             {/*  body  */}
@@ -472,31 +487,37 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
               {/*  MONSTER TAB  */}
               {modal === 'monster' && (
                 <>
-                  <p className="text-sm text-gray-400">Choose from SRD monsters:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-                    {SRD_MONSTERS.map((m) => (
-                      <button
-                        key={m.name}
-                        onClick={() => {
-                          addMonster(m);
-                          setModal('closed');
-                        }}
-                        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg p-3 text-left transition"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-white font-semibold">{m.name}</div>
-                            <div className="text-xs text-gray-400">CR {m.cr} · {m.size} {m.monsterType}</div>
-                          </div>
-                          <div className="text-xs text-gray-300 text-right">
-                            <div>HP {m.maxHp}</div>
-                            <div>AC {m.ac}</div>
-                            <div>Init +{m.dexMod}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  {loading && <p className="text-sm text-gray-400">Loading monsters...</p>}
+                  {!loading && remoteMonsters.length === 0 && <p className="text-sm text-gray-400">Could not load monsters.</p>}
+                  {!loading && remoteMonsters.length > 0 && (
+                    <>
+                      <p className="text-sm text-gray-400">Choose from full SRD (first 200):</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                        {remoteMonsters.slice(0, 200).map((m) => (
+                          <button
+                            key={m.name}
+                            onClick={() => {
+                              addMonster(m);
+                              setModal('closed');
+                            }}
+                            className="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg p-3 text-left transition"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-white font-semibold">{m.name}</div>
+                                <div className="text-xs text-gray-400">CR {m.cr} · {m.size} {m.monsterType}</div>
+                              </div>
+                              <div className="text-xs text-gray-300 text-right">
+                                <div>HP {m.maxHp}</div>
+                                <div>AC {m.ac}</div>
+                                <div>Init +{m.dexMod}</div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <details className="text-sm text-gray-400">
                     <summary className="cursor-pointer">Custom monster (home-brew)</summary>
                     <div className="mt-2 space-y-2">
