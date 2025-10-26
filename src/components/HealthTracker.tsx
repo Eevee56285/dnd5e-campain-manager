@@ -132,61 +132,57 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
           </div>
 
           {/* controls */}
-          {readOnly ? (
-            <p className="text-center text-sm text-gray-500">Not in combat</p>
-          ) : (
-            <>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => updateHP(c.id, -(parseInt(hpChanges[c.id] || '1') || 1))}
-                  className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
-                >
-                  <Minus size={20} />
-                </button>
+  <p className="text-center text-sm text-gray-500">Not in combat</p>
+) : (
+  <>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => updateHP(c.id, -(parseInt(hpChanges[c.id] || '1') || 1))}
+        className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
+      >
+        <Minus size={20} />
+      </button>
 
-                <input
-                  type="number"
-                  value={hpChanges[c.id] || ''}
-                  onChange={(e) => setHpChanges((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                  placeholder="Amount"
-                  className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
-                />
+      <input
+        type="number"
+        value={hpChanges[c.id] || ''}
+        onChange={(e) => setHpChanges((prev) => ({ ...prev, [c.id]: e.target.value }))}
+        placeholder="Amount"
+        className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
+      />
 
-                <button
-                  onClick={() => updateHP(c.id, parseInt(hpChanges[c.id] || '1') || 1)}
-                  className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
-                >
-                  <Plus size={20} />
-                </button>
+      <button
+        onClick={() => updateHP(c.id, parseInt(hpChanges[c.id] || '1') || 1)}
+        className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
+      >
+        <Plus size={20} />
+      </button>
 
-                <button
-                  onClick={() => setHP(c.id, c.character.maxHp)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
-                >
-                  Full Heal
-                </button>
-              </div>
+      <button
+        onClick={() => setHP(c.id, c.character.maxHp)}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
+      >
+        Full Heal
+      </button>
+    </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setHP(c.id, Math.floor(c.character.maxHp / 2))}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-                >
-                  50% HP
-                </button>
-                <button
-                  onClick={() => setHP(c.id, 0)}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-                >
-                  Down (0 HP)
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
+    {/* 50 % / 0 HP quick-set buttons */}
+    <div className="flex gap-2">
+      <button
+        onClick={() => setHP(c.id, Math.floor(c.character.maxHp / 2))}
+        className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+      >
+        50% HP
+      </button>
+      <button
+        onClick={() => setHP(c.id, 0)}
+        className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+      >
+        Down (0 HP)
+      </button>
+    </div>
+  </>
+)}
 
   return (
     <div className="space-y-6">
