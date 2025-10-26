@@ -1,27 +1,33 @@
 import { useState, useEffect } from 'react';
-import { storage, type Campaign } from '../lib/storage';
-import { Plus, Swords, Trash2 } from 'lucide-react';
+import { Plus, Swords, Settings, UserPlus, Trash2 } from 'lucide-react';
+import { useUser } from '../lib/UserContext';
+import { multiplayerStorage, type MultiplayerCampaign } from '../lib/multiplayerStorage';
+import { JoinCampaignModal } from './JoinCampaignModal';
 
 type CampaignListProps = {
-  onSelectCampaign: (campaignId: string, campaignName: string) => void;
+  onSelectCampaign: (campaignId: string, campaignName: string, joinCode: string) => void;
 };
 
 export function CampaignList({ onSelectCampaign }: CampaignListProps) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const { user } = useUser();
+  const [campaigns, setCampaigns] = useState<MultiplayerCampaign[]>([]);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [showInput, setShowInput] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
 
   useEffect(() => {
     loadCampaigns();
   }, []);
 
   const loadCampaigns = () => {
-    setCampaigns(storage.getCampaigns());
+    if (user?.id) {
+      setCampaigns(multiplayerStorage.getCampaignsForUser(user.id));
+    }
   };
 
   const createCampaign = () => {
-    if (!newCampaignName.trim()) return;
-    storage.addCampaign(newCampaignName);
+    if (!newCampaignName.trim() || !user?.id) return;
+    multiplayerStorage.addCampaign(newCampaignName, user.id);
     setNewCampaignName('');
     setShowInput(false);
     loadCampaigns();
@@ -29,7 +35,7 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
 
   const deleteCampaign = (id: string) => {
     if (!confirm('Delete this campaign?')) return;
-    storage.deleteCampaign(id);
+    multiplayerStorage.deleteCampaign(id);
     loadCampaigns();
   };
 
@@ -40,13 +46,20 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
           <Swords size={36} className="text-red-600" />
           D&D Campaign Manager
         </h1>
-        <button
-          onClick={() => setShowInput(!showInput)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
-        >
-          <Plus size={20} />
-          New Campaign
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowInput(!showInput)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+          >
+            <Plus size={20} /> New Campaign
+          </button>
+          <button
+            onClick={() => setShowJoinModal(true)}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+          >
+            <UserPlus size={20} /> Join Campaign
+          </button>
+        </div>
       </div>
 
       {showInput && (
@@ -84,7 +97,7 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
         {campaigns.length === 0 ? (
           <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-12 text-center">
             <Swords size={48} className="mx-auto mb-4 text-slate-600" />
-            <p className="text-gray-400 text-lg">No campaigns yet. Create one to get started!</p>
+            <p className="text-gray-400 text-lg">No campaigns yet. Create or join one to get started!</p>
           </div>
         ) : (
           campaigns.map((campaign) => (
@@ -94,7 +107,9 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
             >
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => onSelectCampaign(campaign.id, campaign.name)}
+                  onClick={() =>
+                    onSelectCampaign(campaign.id, campaign.name, campaign.joinCode || '')
+                  }
                   className="flex-1 text-left"
                 >
                   <h3 className="text-2xl font-bold text-white mb-2">{campaign.name}</h3>
@@ -114,6 +129,16 @@ export function CampaignList({ onSelectCampaign }: CampaignListProps) {
           ))
         )}
       </div>
+
+      {showJoinModal && (
+        <JoinCampaignModal
+          onClose={() => setShowJoinModal(false)}
+          onJoin={(campaign) => {
+            onSelectCampaign(campaign.id, campaign.name, campaign.joinCode || '');
+            setShowJoinModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
