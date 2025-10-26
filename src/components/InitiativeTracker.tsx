@@ -77,7 +77,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const [newMax, setNewMax]         = useState('');
   const [newAc, setNewAc]           = useState('');
   const [newDex, setNewDex]         = useState('');
-  const [manualInit, setManualInit] = useState('');          // <- manual roll
+  const [manualInit, setManualInit] = useState('');
   const [editing, setEditing]       = useState<string | null>(null);
   const [hpEdit, setHpEdit]         = useState('');
   const [dropdown, setDropdown]     = useState<string | null>(null);
@@ -361,7 +361,6 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
             {/*  header  */}
             <div className="flex items-center justify-between p-4 border-b border-slate-700">
               <h3 className="text-xl font-bold text-white">Add {modal === 'monster' ? 'Monster' : modal === 'player' ? 'Player' : 'NPC'}</h3>
-              <button onClick={() => setModal('closed')} className="text-gray-400 hover:text-white"><X size={20} /></button>
             </div>
 
             {/*  body  */}
@@ -520,6 +519,11 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                   </details>
                 </>
               )}
+            </div>
+
+            {/*  footer  */}
+            <div className="p-4 border-t border-slate-700 flex justify-end">
+              <button onClick={() => setModal('closed')} className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded">Close</button>
             </div>
           </div>
         </div>
