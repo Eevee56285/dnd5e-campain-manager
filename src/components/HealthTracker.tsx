@@ -14,7 +14,6 @@ type Combatant = {
   conditions: string[];
 };
 
-/* ---------- helpers ---------- */
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
 const CHAR_KEY   = 'dnd_characters';
 
@@ -68,12 +67,12 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setEditing(null);
   };
 
-  /* ---------- damage / heal (allows negative down to -max) ---------- */
+  /* ---------- damage / heal (negative allowed down to -max) ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
       l.map((c) =>
         c.id === id
-          ? { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) } // ← negative cap
+          ? { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) }
           : c
       )
     );
@@ -147,8 +146,8 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
       {combatants.length === 0 && !adding && <p className="text-gray-400 text-center py-8">No characters in tracker.</p>}
 
       {combatants.map((c) => {
-        const pct = Math.max(0, Math.min(100, Math.round(((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100)));
-        const barColor = barColour(pct);
+        const pct = Math.max(0, Math.min(100, ((c.currentHp + c.maxHp) / (c.maxHp * 2)) * 100));
+        const barColor = pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
         return (
           <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
