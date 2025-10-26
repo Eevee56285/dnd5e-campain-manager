@@ -32,7 +32,7 @@ const CONDITIONS = [
   { name: 'Exhaustion 3', emoji: '😩' },
   { name: 'Exhaustion 4', emoji: '😩' },
   { name: 'Exhaustion 5', emoji: '😩' },
-  { name: 'Exhaustion 6', emoji: '💀' }, // <- 6 = Dead
+  { name: 'Exhaustion 6', emoji: '💀' },
 ];
 
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
@@ -136,15 +136,18 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const startEdit = (c: Combatant) => { setEditing(c.id); setHpEdit(String(c.currentHp)); };
   const saveEdit  = (id: string) => {
     const val = parseInt(hpEdit) || 0;
-    setCombatants((l) => l.map((x) => (x.id === id ? { ...x, currentHp: val } : x)));
+    setCombatants((l) => l.map((x) => (x.id === id ? { ...x, currentHp: Math.min(x.maxHp, val) } : x)));
     setEditing(null);
   };
 
-  /* ---------- damage / heal (negative allowed to -max) ---------- */
+  /* ---------- damage / heal (negative allowed to -max, positive clamped to max) ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
       l.map((c) => {
-        const after = { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) };
+        const after = {
+          ...c,
+          currentHp: Math.min(c.maxHp, Math.max(-c.maxHp, c.currentHp + amount)),
+        };
         return enforceExhaustion6(after);
       })
     );
