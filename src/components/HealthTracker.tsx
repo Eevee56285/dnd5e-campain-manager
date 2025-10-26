@@ -32,7 +32,7 @@ const CONDITIONS = [
   { name: 'Exhaustion 3', emoji: '😩' },
   { name: 'Exhaustion 4', emoji: '😩' },
   { name: 'Exhaustion 5', emoji: '😩' },
-  { name: 'Exhaustion 6', emoji: '😩' },
+  { name: 'Exhaustion 6', emoji: '💀' }, // <- 6 = Dead
 ];
 
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
@@ -43,6 +43,13 @@ const barPct = (cur: number, max: number) =>
 
 const barColour = (pct: number) =>
   pct <= 0 ? 'bg-red-600' : pct <= 50 ? 'bg-yellow-500' : 'bg-green-500';
+
+/* ---------- helpers ---------- */
+const isExhaustion6 = (conds: string[]) => conds.includes('Exhaustion 6');
+const enforceExhaustion6 = (c: Combatant): Combatant =>
+  isExhaustion6(c.conditions) && c.currentHp > -c.maxHp
+    ? { ...c, currentHp: -c.maxHp }
+    : c;
 
 export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [combatants, setCombatants] = useState<Combatant[]>([]);
@@ -55,10 +62,13 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [hpEdit, setHpEdit]         = useState('');
   const [dropdown, setDropdown]     = useState<string | null>(null);
 
-  /* ---------- load ---------- */
+  /* ---------- load + enforce Exhaustion 6 ---------- */
   useEffect(() => {
     const raw = localStorage.getItem(HEALTH_KEY(campaignId));
-    if (raw) setCombatants(JSON.parse(raw));
+    if (raw) {
+      const loaded: Combatant[] = JSON.parse(raw);
+      setCombatants(loaded.map(enforceExhaustion6));
+    }
     const libRaw = localStorage.getItem(CHAR_KEY);
     if (libRaw) setLibrary(JSON.parse(libRaw));
   }, [campaignId]);
@@ -84,12 +94,13 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
       try {
         const imported = JSON.parse(e.target?.result as string) as Combatant[];
         if (!Array.isArray(imported)) throw new Error('Not an array');
-        if (wipeFirst) setCombatants(imported);
+        const enforced = imported.map(enforceExhaustion6);
+        if (wipeFirst) setCombatants(enforced);
         else
           setCombatants((prev) => {
             const existing = new Set(prev.map((c) => c.name));
             const merged   = [...prev];
-            imported.forEach((c) => {
+            enforced.forEach((c) => {
               if (!existing.has(c.name)) merged.push({ ...c, id: crypto.randomUUID() });
             });
             return merged;
@@ -129,14 +140,13 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     setEditing(null);
   };
 
-  /* ---------- damage / heal ---------- */
+  /* ---------- damage / heal (negative allowed to -max) ---------- */
   const apply = (id: string, amount: number) =>
     setCombatants((l) =>
-      l.map((c) =>
-        c.id === id
-          ? { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) }
-          : c
-      )
+      l.map((c) => {
+        const after = { ...c, currentHp: Math.max(-c.maxHp, c.currentHp + amount) };
+        return enforceExhaustion6(after);
+      })
     );
 
   const setTemp = (id: string, n: number) =>
@@ -146,6 +156,7 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
 
   /* ---------- status badge ---------- */
   const statusBadge = (c: Combatant) => {
+    if (isExhaustion6(c.conditions)) return { text: 'Dead (Exhaustion 6)', color: 'bg-red-700' };
     if (c.currentHp <= -c.maxHp) return { text: 'Dead', color: 'bg-red-700' };
     if (c.currentHp === 0) return { text: 'Unconscious', color: 'bg-gray-700' };
     if (c.currentHp <= Math.floor(c.maxHp / 2)) return { text: 'Bloodied', color: 'bg-orange-600' };
@@ -154,22 +165,24 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
 
   /* ---------- condition add ---------- */
   const addCondition = (id: string, cond: { name: string; emoji: string }) => {
-    setCombatants((l) =>
-      l.map((c) =>
+    setCombatants((l) => {
+      const next = l.map((c) =>
         c.id === id && !c.conditions.includes(cond.name)
           ? { ...c, conditions: [...c.conditions, cond.name] }
           : c
-      )
-    );
+      );
+      return next.map(enforceExhaustion6);
+    });
     setDropdown(null);
   };
 
   const removeCondition = (id: string, name: string) =>
-    setCombatants((l) =>
-      l.map((c) =>
+    setCombatants((l) => {
+      const next = l.map((c) =>
         c.id === id ? { ...c, conditions: c.conditions.filter((x) => x !== name) } : c
-      )
-    );
+      );
+      return next.map(enforceExhaustion6);
+    });
 
   /* ---------- render ---------- */
   return (
