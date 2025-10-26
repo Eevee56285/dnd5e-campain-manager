@@ -64,14 +64,10 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const [activeId, setActiveId]     = useState<string | null>(null);
   const [round, setRound]           = useState(1);
   const [menu, setMenu]             = useState<'closed' | 'player' | 'npc' | 'monster'>('closed');
-  const [newName, setNewName]       = useState('');
-  const [newMax, setNewMax]         = useState('');
-  const [newAc, setNewAc]           = useState('');
-  const [newDex, setNewDex]         = useState('');
-  const [manualInit, setManualInit] = useState('');
   const [library, setLibrary]       = useState<LibraryCharacter[]>([]);
   const [remoteMonsters, setRemote] = useState<Combatant[]>([]);
   const [loading, setLoading]       = useState(false);
+  const [manualInit, setManualInit] = useState('');
 
   /* ---------- load local library + initiative ---------- */
   useEffect(() => {
@@ -162,32 +158,6 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
     };
     setCombatants((prev) => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
     setMenu('closed');
-  };
-
-  /* ---------- add custom (inline form) ---------- */
-  const [customType, setCustomType] = useState<'player' | 'npc' | 'monster'>('monster');
-  const addCustomInline = () => {
-    const mHp = parseInt(newMax) || 10;
-    const nAc = parseInt(newAc) || 10;
-    const nDex = parseInt(newDex) || 0;
-    const init = manualInit === '' ? roll(nDex) : parseInt(manualInit) || 0;
-    const newC: Combatant = {
-      id: crypto.randomUUID(),
-      name: newName.trim() || 'Unnamed',
-      maxHp: mHp,
-      currentHp: mHp,
-      ac: nAc,
-      initiative: init,
-      dexMod: nDex,
-      type: customType,
-      speed: '30 ft.',
-      size: 'Medium',
-      conditions: [],
-      tempHp: 0,
-    };
-    setCombatants((prev) => [...prev, newC].sort((a, b) => b.initiative - a.initiative));
-    // reset
-    setNewName(''); setNewMax(''); setNewAc(''); setNewDex(''); setManualInit(''); setMenu('closed');
   };
 
   /* ---------- remove ---------- */
@@ -339,7 +309,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
           {!loading && remoteMonsters.length === 0 && <p className="text-sm text-gray-400">Could not load monsters.</p>}
           {!loading && remoteMonsters.length > 0 && (
             <>
-              <p className="text-xs text-gray-400">First 200 of full SRD:</p>
+              <p className="text-xs text-gray-400">Full SRD (first 200 shown):</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
                 {remoteMonsters.slice(0, 200).map((m) => (
                   <div key={m.name} className="bg-slate-700 border border-slate-600 rounded-lg p-3">
