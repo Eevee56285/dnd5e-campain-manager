@@ -11,6 +11,9 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
   const [combatants, setCombatants] = useState<CombatantDisplay[]>([]);
   const [hpChanges, setHpChanges] = useState<Record<string, string>>({});
 
+  /* Local mirror of CURRENT hp (characterId -> hp) – drives the bar instantly */
+  const [localHp, setLocalHp] = useState<Record<string, number>>({});
+
   /* ---------- derived data ---------- */
   const characters = useMemo(() => storage.getCharacters(), []);
   const session = useMemo(() => {
@@ -18,61 +21,77 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     return s?.campaignId === campaignId ? s : null;
   }, [campaignId]);
 
-  /* ---------- load / merge ---------- */
+  /* ---------- central HP writer – updates ALL sources ---------- */
+  const syncHp = (characterId: string, newValue: number) => {
+    const clamped = Math.max(0, newValue);
+
+    /* 1. battle session (if in combat) */
+    if (session) {
+      const combatant = session.combatants.find(c => c.characterId === characterId);
+      if (combatant) {
+        combatant.currentHp = clamped;
+        storage.saveBattleSession(session);
+      }
+    }
+
+    /* 2. character sheet (persists when they leave combat) */
+    const ch = characters.find(c => c.id === characterId);
+    if (ch) {
+      (ch as any).currentHp = clamped; // or add currentHp?:number to Character type
+      storage.saveCharacter(ch);
+    }
+
+    /* 3. local mirror → instant UI */
+    setLocalHp(prev => ({ ...prev, [characterId]: clamped }));
+  };
+
+  /* ---------- load / merge list + seed localHp once ---------- */
   useEffect(() => {
     const inSession = session?.combatants ?? [];
-    const inSessionIds = new Set(inSession.map((c) => c.characterId));
+    const inSessionIds = new Set(inSession.map(c => c.characterId));
+    const charMap = new Map(characters.map(c => [c.id, c]));
 
-    /* build quick lookup map */
-    const charMap = new Map(characters.map((c) => [c.id, c]));
-
-    /* active combatants (editable) */
     const active: CombatantDisplay[] = inSession
-      .map((c) => {
+      .map(c => {
         const ch = charMap.get(c.characterId);
         return ch ? { ...c, character: ch } : null;
       })
       .filter((c): c is CombatantDisplay => Boolean(c));
 
-    /* roster characters (not in session) */
     const roster = characters
-      .filter((ch) => !inSessionIds.has(ch.id))
+      .filter(ch => !inSessionIds.has(ch.id))
       .map((ch): CombatantDisplay => ({
-        id: `roster-${ch.id}`,          // fake id so React key is unique
+        id: `roster-${ch.id}`,
         characterId: ch.id,
-        currentHp: ch.maxHp,            // show max by default
-        initiative: 0,                  // not rolled
+        currentHp: (ch as any).currentHp ?? ch.maxHp,
+        initiative: 0,
         character: ch,
       }));
 
-    setCombatants([...active, ...roster]);
+    const merged = [...active, ...roster];
+    setCombatants(merged);
+
+    const seed: Record<string, number> = {};
+    merged.forEach(c => { seed[c.characterId] = c.currentHp; });
+    setLocalHp(seed);
   }, [session, characters]);
 
-  /* ---------- helpers ---------- */
+  /* ---------- button helpers ---------- */
   const updateHP = (id: string, delta: number) => {
-    if (!session) return; // roster characters are read-only
-    const c = session.combatants.find((x) => x.id === id);
-    const cd = combatants.find((x) => x.id === id);
-    if (!c || !cd) return;
-
-    c.currentHp = Math.max(0, Math.min(cd.character.maxHp, c.currentHp + delta));
-    storage.saveBattleSession(session);
-    setHpChanges((prev) => ({ ...prev, [id]: '' }));
-    /* trigger re-render */
-    setCombatants((prev) => [...prev]);
+    const characterId = combatants.find(c => c.id === id)?.characterId;
+    if (!characterId) return;
+    const prev = localHp[characterId] ?? combatants.find(c => c.characterId === characterId)?.currentHp ?? 0;
+    syncHp(characterId, prev + delta);
+    setHpChanges(prev => ({ ...prev, [id]: '' }));
   };
 
   const setHP = (id: string, value: number) => {
-    if (!session) return;
-    const c = session.combatants.find((x) => x.id === id);
-    const cd = combatants.find((x) => x.id === id);
-    if (!c || !cd) return;
-
-    c.currentHp = Math.max(0, Math.min(cd.character.maxHp, value));
-    storage.saveBattleSession(session);
-    setCombatants((prev) => [...prev]);
+    const characterId = combatants.find(c => c.id === id)?.characterId;
+    if (!characterId) return;
+    syncHp(characterId, value);
   };
 
+  /* ---------- util ---------- */
   const getHealthPercentage = (cur: number, max: number) => (max ? (cur / max) * 100 : 0);
   const getHealthColor = (p: number) =>
     p > 66 ? 'bg-green-600' : p > 33 ? 'bg-yellow-600' : p > 0 ? 'bg-red-600' : 'bg-gray-600';
@@ -83,11 +102,11 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
     <Skull size={24} className="text-red-400" />;
 
   /* ---------- render ---------- */
-  const activeList = combatants.filter((c) => !c.id.startsWith('roster-'));
-  const rosterList = combatants.filter((c) => c.id.startsWith('roster-'));
+  const activeList = combatants.filter(c => !c.id.startsWith('roster-'));
+  const rosterList = combatants.filter(c => c.id.startsWith('roster-'));
 
   const renderCard = (c: CombatantDisplay, readOnly = false) => {
-    const hp = readOnly ? c.character.maxHp : c.currentHp;
+    const hp = localHp[c.characterId] ?? c.currentHp; // real-time value
     const pct = getHealthPercentage(hp, c.character.maxHp);
     const isUnconscious = hp === 0;
 
@@ -132,57 +151,61 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
           </div>
 
           {/* controls */}
-  <p className="text-center text-sm text-gray-500">Not in combat</p>
-) : (
-  <>
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => updateHP(c.id, -(parseInt(hpChanges[c.id] || '1') || 1))}
-        className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
-      >
-        <Minus size={20} />
-      </button>
+          {readOnly ? (
+            <p className="text-center text-sm text-gray-500">Not in combat</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => updateHP(c.id, -(parseInt(hpChanges[c.id] || '1') || 1))}
+                  className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
+                >
+                  <Minus size={20} />
+                </button>
 
-      <input
-        type="number"
-        value={hpChanges[c.id] || ''}
-        onChange={(e) => setHpChanges((prev) => ({ ...prev, [c.id]: e.target.value }))}
-        placeholder="Amount"
-        className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
-      />
+                <input
+                  type="number"
+                  value={hpChanges[c.id] || ''}
+                  onChange={(e) => setHpChanges(prev => ({ ...prev, [c.id]: e.target.value }))}
+                  placeholder="Amount"
+                  className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
+                />
 
-      <button
-        onClick={() => updateHP(c.id, parseInt(hpChanges[c.id] || '1') || 1)}
-        className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
-      >
-        <Plus size={20} />
-      </button>
+                <button
+                  onClick={() => updateHP(c.id, parseInt(hpChanges[c.id] || '1') || 1)}
+                  className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
+                >
+                  <Plus size={20} />
+                </button>
 
-      <button
-        onClick={() => setHP(c.id, c.character.maxHp)}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
-      >
-        Full Heal
-      </button>
-    </div>
+                <button
+                  onClick={() => setHP(c.id, c.character.maxHp)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
+                >
+                  Full Heal
+                </button>
+              </div>
 
-    {/* 50 % / 0 HP quick-set buttons */}
-    <div className="flex gap-2">
-      <button
-        onClick={() => setHP(c.id, Math.floor(c.character.maxHp / 2))}
-        className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-      >
-        50% HP
-      </button>
-      <button
-        onClick={() => setHP(c.id, 0)}
-        className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-      >
-        Down (0 HP)
-      </button>
-    </div>
-  </>
-)}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setHP(c.id, Math.floor(c.character.maxHp / 2))}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+                >
+                  50% HP
+                </button>
+                <button
+                  onClick={() => setHP(c.id, 0)}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+                >
+                  Down (0 HP)
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -195,14 +218,14 @@ export function HealthTracker({ campaignId }: HealthTrackerProps) {
       {activeList.length > 0 && (
         <section>
           <h3 className="text-lg font-semibold text-white mb-3">Active Combatants</h3>
-          <div className="space-y-4">{activeList.map((c) => renderCard(c))}</div>
+          <div className="space-y-4">{activeList.map(c => renderCard(c))}</div>
         </section>
       )}
 
       {rosterList.length > 0 && (
         <section>
           <h3 className="text-lg font-semibold text-white mb-3">Roster</h3>
-          <div className="space-y-4">{rosterList.map((c) => renderCard(c, true))}</div>
+          <div className="space-y-4">{rosterList.map(c => renderCard(c, true))}</div>
         </section>
       )}
     </div>
