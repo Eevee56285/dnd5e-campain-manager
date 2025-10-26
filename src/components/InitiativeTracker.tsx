@@ -100,11 +100,11 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'player':
-        return <User size={20} className="text-blue-400" />;
+        return <User size={18} className="sm:w-5 sm:h-5 text-blue-400" />;
       case 'npc':
-        return <Users size={20} className="text-green-400" />;
+        return <Users size={18} className="sm:w-5 sm:h-5 text-green-400" />;
       case 'monster':
-        return <Skull size={20} className="text-red-400" />;
+        return <Skull size={18} className="sm:w-5 sm:h-5 text-red-400" />;
     }
   };
 
@@ -115,29 +115,30 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
       <div className="mb-4 flex justify-end">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+          className="bg-red-600 hover:bg-red-700 active:scale-95 text-white px-3 sm:px-4 py-2 rounded flex items-center gap-2 transition-all text-sm sm:text-base"
         >
-          <Plus size={20} />
-          Add Combatant
+          <Plus size={18} className="sm:w-5 sm:h-5" />
+          <span className="hidden xs:inline">Add Combatant</span>
+          <span className="xs:hidden">Add</span>
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
-          <h3 className="text-xl font-bold text-white mb-4">Add Combatant</h3>
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-4">Add Combatant</h3>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Select Character</label>
               <select
                 value={selectedCharacterId}
                 onChange={(e) => setSelectedCharacterId(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
               >
                 <option value="">Choose a character...</option>
                 {availableCharacters.map((char) => (
                   <option key={char.id} value={char.id}>
-                    {char.name} ({char.type}) - AC: {char.armorClass}, HP: {char.maxHp}
+                    {char.name} ({char.type})
                   </option>
                 ))}
               </select>
@@ -145,7 +146,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
 
             {selectedCharacter && (
               <>
-                <div className="bg-slate-700 rounded p-3 text-sm text-gray-300">
+                <div className="bg-slate-700 rounded p-3 text-xs sm:text-sm text-gray-300">
                   <p>
                     <strong>HP:</strong> {selectedCharacter.maxHp} | <strong>AC:</strong>{' '}
                     {selectedCharacter.armorClass} | <strong>DEX:</strong>{' '}
@@ -154,11 +155,11 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                     {selectedCharacter.level && (
                       <>
                         {' '}
-                        | <strong>Level:</strong> {selectedCharacter.level}
+                        | <strong>Lvl:</strong> {selectedCharacter.level}
                       </>
                     )}
                   </p>
-                  {selectedCharacter.notes && <p className="mt-1">{selectedCharacter.notes}</p>}
+                  {selectedCharacter.notes && <p className="mt-1 text-gray-400">{selectedCharacter.notes}</p>}
                 </div>
 
                 <div>
@@ -171,7 +172,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                         onChange={() => setUseAutoRoll(false)}
                         className="text-red-600"
                       />
-                      <span className="text-white">Enter Initiative Roll</span>
+                      <span className="text-white text-sm sm:text-base">Enter Initiative Roll</span>
                     </label>
                     {!useAutoRoll && (
                       <div className="flex gap-2">
@@ -179,16 +180,15 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                           type="number"
                           value={initiativeRoll}
                           onChange={(e) => setInitiativeRoll(e.target.value)}
-                          placeholder="Initiative roll"
-                          className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
+                          placeholder="Initiative"
+                          className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
                         />
                         <button
                           onClick={() => rollInitiativeForCharacter(selectedCharacterId)}
-                          className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded flex items-center gap-2 transition-colors"
+                          className="bg-slate-600 hover:bg-slate-500 active:scale-95 text-white px-3 py-2.5 sm:py-2 rounded flex items-center gap-2 transition-all"
                           title="Roll initiative"
                         >
                           <Dices size={18} />
-                          Roll
                         </button>
                       </div>
                     )}
@@ -200,7 +200,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                         onChange={() => setUseAutoRoll(true)}
                         className="text-red-600"
                       />
-                      <span className="text-white">Auto-roll with DEX modifier</span>
+                      <span className="text-white text-sm sm:text-base">Auto-roll with DEX</span>
                     </label>
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
               <button
                 onClick={addCombatant}
                 disabled={!selectedCharacterId || (!useAutoRoll && !initiativeRoll)}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 active:scale-95 text-white px-4 py-2.5 sm:py-2 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add
               </button>
@@ -222,7 +222,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
                   setInitiativeRoll('');
                   setUseAutoRoll(false);
                 }}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded transition-colors"
+                className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 active:scale-95 text-white px-4 py-2.5 sm:py-2 rounded transition-all"
               >
                 Cancel
               </button>
@@ -233,44 +233,43 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
 
       <div className="space-y-2">
         {combatants.length === 0 ? (
-          <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
-            <p className="text-gray-400">
-              No combatants yet. Add characters from your library to start tracking initiative!
+          <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-6 sm:p-8 text-center">
+            <p className="text-gray-400 text-sm sm:text-base">
+              No combatants yet. Add characters to start tracking initiative!
             </p>
           </div>
         ) : (
-          combatants.map((combatant, index) => (
+          combatants.map((combatant) => (
             <div
               key={combatant.id}
-              className="bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-red-600 transition-colors"
+              className="bg-slate-800 border border-slate-700 rounded-lg p-3 sm:p-4 hover:border-red-600 active:border-red-500 transition-colors"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="bg-red-600 text-white font-bold rounded-full w-12 h-12 flex items-center justify-center text-xl">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                  <div className="bg-red-600 text-white font-bold rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-lg sm:text-xl flex-shrink-0">
                     {combatant.initiative}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                     {getTypeIcon(combatant.character.type)}
-                    <div>
-                      <h4 className="text-lg font-bold text-white">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-base sm:text-lg font-bold text-white truncate">
                         {combatant.character.name}
                         {combatant.character.level && (
-                          <span className="text-sm text-gray-400 ml-2">Lvl {combatant.character.level}</span>
+                          <span className="text-xs sm:text-sm text-gray-400 ml-1 sm:ml-2">Lvl {combatant.character.level}</span>
                         )}
                       </h4>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-xs sm:text-sm text-gray-400 truncate">
                         AC: {combatant.character.armorClass} | HP: {combatant.currentHp}/{combatant.character.maxHp}
-                        {combatant.character.notes && ` | ${combatant.character.notes}`}
                       </p>
                     </div>
                   </div>
                 </div>
                 <button
                   onClick={() => removeCombatant(combatant.id)}
-                  className="text-red-500 hover:text-red-400 transition-colors p-2"
+                  className="text-red-500 hover:text-red-400 active:scale-95 transition-all p-1.5 sm:p-2 flex-shrink-0"
                   aria-label="Remove combatant"
                 >
-                  <Trash2 size={20} />
+                  <Trash2 size={18} className="sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
