@@ -105,7 +105,7 @@ export function InitiativeTracker({ campaignId }: InitiativeTrackerProps) {
       fetch(MONSTERS_URL)
         .then((r) => r.json())
         .then((data: any[]) => {
-          const list: Combatant[] = data.slice(0, 200).map((m: any) => ({
+          const list: Combatant[] = data.slice(0, 200000).map((m: any) => ({
             name: m.name,
             maxHp: m.hit_points,
             currentHp: m.hit_points,
