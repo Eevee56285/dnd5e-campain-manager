@@ -18,13 +18,26 @@ type BattleSession = {
   currentTurn: number;
 };
 
+/* ----------  single-campaign localStorage helpers  ---------- */
+const BATTLE_KEY = (id: string) => `dnd_battle_${id}`;
+
+const getBattle = (id: string): BattleSession | null =>
+  JSON.parse(localStorage.getItem(BATTLE_KEY(id)) || 'null');
+
+const saveBattle = (id: string, s: BattleSession) =>
+  localStorage.setItem(BATTLE_KEY(id), JSON.stringify(s));
+
+const clearBattle = (id: string) =>
+  localStorage.removeItem(BATTLE_KEY(id));
+
 export function BattleManager({ campaignId, campaignName, onBack }: BattleManagerProps) {
   const [battleActive, setBattleActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'characters' | 'initiative' | 'health'>('characters');
 
+  /* load persisted battle on mount */
   useEffect(() => {
-    const session = storage.getBattleSession();
-    if (session && session.campaignId === campaignId && session.isActive) {
+    const session = getBattle(campaignId);
+    if (session && session.isActive) {
       setBattleActive(true);
       setActiveTab('initiative');
     }
@@ -38,14 +51,14 @@ export function BattleManager({ campaignId, campaignName, onBack }: BattleManage
       round: 1,
       currentTurn: 0,
     };
-    storage.saveBattleSession(session);
+    saveBattle(campaignId, session);
     setBattleActive(true);
     setActiveTab('initiative');
   };
 
   const endBattle = () => {
     if (!confirm('End this battle? All initiative and combat data will be cleared.')) return;
-    storage.clearBattleSession();
+    clearBattle(campaignId);
     setBattleActive(false);
     setActiveTab('characters');
   };
