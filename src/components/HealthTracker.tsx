@@ -1,207 +1,213 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { storage, type Character, type ActiveCombatant } from '../lib/storage';
 import { Heart, Minus, Plus, User, Users, Skull } from 'lucide-react';
 
-type HealthTrackerProps = {
-  campaignId: string;
-};
+type HealthTrackerProps = { campaignId: string };
 
-type CombatantDisplay = ActiveCombatant & {
-  character: Character;
-};
+type CombatantDisplay = ActiveCombatant & { character: Character };
 
 export function HealthTracker({ campaignId }: HealthTrackerProps) {
+  /* ---------- state ---------- */
   const [combatants, setCombatants] = useState<CombatantDisplay[]>([]);
-  const [hpChanges, setHpChanges] = useState<{ [key: string]: string }>({});
+  const [hpChanges, setHpChanges] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    loadCombatants();
+  /* ---------- derived data ---------- */
+  const characters = useMemo(() => storage.getCharacters(), []);
+  const session = useMemo(() => {
+    const s = storage.getBattleSession();
+    return s?.campaignId === campaignId ? s : null;
   }, [campaignId]);
 
-  const loadCombatants = () => {
-    const session = storage.getBattleSession();
-    if (!session || session.campaignId !== campaignId) {
-      setCombatants([]);
-      return;
-    }
+  /* ---------- load / merge ---------- */
+  useEffect(() => {
+    const inSession = session?.combatants ?? [];
+    const inSessionIds = new Set(inSession.map((c) => c.characterId));
 
-    const characters = storage.getCharacters();
-    const combatantsList: CombatantDisplay[] = session.combatants
+    /* build quick lookup map */
+    const charMap = new Map(characters.map((c) => [c.id, c]));
+
+    /* active combatants (editable) */
+    const active: CombatantDisplay[] = inSession
       .map((c) => {
-        const character = characters.find((ch) => ch.id === c.characterId);
-        if (!character) return null;
-        return { ...c, character };
+        const ch = charMap.get(c.characterId);
+        return ch ? { ...c, character: ch } : null;
       })
-      .filter((c): c is CombatantDisplay => c !== null)
-      .sort((a, b) => a.character.name.localeCompare(b.character.name));
+      .filter((c): c is CombatantDisplay => Boolean(c));
 
-    setCombatants(combatantsList);
-  };
+    /* roster characters (not in session) */
+    const roster = characters
+      .filter((ch) => !inSessionIds.has(ch.id))
+      .map((ch): CombatantDisplay => ({
+        id: `roster-${ch.id}`,          // fake id so React key is unique
+        characterId: ch.id,
+        currentHp: ch.maxHp,            // show max by default
+        initiative: 0,                  // not rolled
+        character: ch,
+      }));
 
-  const updateHP = (id: string, change: number) => {
-    const session = storage.getBattleSession();
-    if (!session) return;
+    setCombatants([...active, ...roster]);
+  }, [session, characters]);
 
-    const combatant = session.combatants.find((c) => c.id === id);
-    const character = combatants.find((c) => c.id === id)?.character;
-    if (!combatant || !character) return;
+  /* ---------- helpers ---------- */
+  const updateHP = (id: string, delta: number) => {
+    if (!session) return; // roster characters are read-only
+    const c = session.combatants.find((x) => x.id === id);
+    const cd = combatants.find((x) => x.id === id);
+    if (!c || !cd) return;
 
-    const newHP = Math.max(0, Math.min(character.maxHp, combatant.currentHp + change));
-    combatant.currentHp = newHP;
-
+    c.currentHp = Math.max(0, Math.min(cd.character.maxHp, c.currentHp + delta));
     storage.saveBattleSession(session);
-    setHpChanges({ ...hpChanges, [id]: '' });
-    loadCombatants();
+    setHpChanges((prev) => ({ ...prev, [id]: '' }));
+    /* trigger re-render */
+    setCombatants((prev) => [...prev]);
   };
 
   const setHP = (id: string, value: number) => {
-    const session = storage.getBattleSession();
     if (!session) return;
+    const c = session.combatants.find((x) => x.id === id);
+    const cd = combatants.find((x) => x.id === id);
+    if (!c || !cd) return;
 
-    const combatant = session.combatants.find((c) => c.id === id);
-    const character = combatants.find((c) => c.id === id)?.character;
-    if (!combatant || !character) return;
-
-    const newHP = Math.max(0, Math.min(character.maxHp, value));
-    combatant.currentHp = newHP;
-
+    c.currentHp = Math.max(0, Math.min(cd.character.maxHp, value));
     storage.saveBattleSession(session);
-    loadCombatants();
+    setCombatants((prev) => [...prev]);
   };
 
-  const getHealthPercentage = (current: number, max: number) => {
-    return (current / max) * 100;
-  };
+  const getHealthPercentage = (cur: number, max: number) => (max ? (cur / max) * 100 : 0);
+  const getHealthColor = (p: number) =>
+    p > 66 ? 'bg-green-600' : p > 33 ? 'bg-yellow-600' : p > 0 ? 'bg-red-600' : 'bg-gray-600';
 
-  const getHealthColor = (percentage: number) => {
-    if (percentage > 66) return 'bg-green-600';
-    if (percentage > 33) return 'bg-yellow-600';
-    if (percentage > 0) return 'bg-red-600';
-    return 'bg-gray-600';
-  };
+  const typeIcon = (t: string) =>
+    t === 'player' ? <User size={24} className="text-blue-400" /> :
+    t === 'npc' ? <Users size={24} className="text-green-400" /> :
+    <Skull size={24} className="text-red-400" />;
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'player':
-        return <User size={24} className="text-blue-400" />;
-      case 'npc':
-        return <Users size={24} className="text-green-400" />;
-      case 'monster':
-        return <Skull size={24} className="text-red-400" />;
-    }
+  /* ---------- render ---------- */
+  const activeList = combatants.filter((c) => !c.id.startsWith('roster-'));
+  const rosterList = combatants.filter((c) => c.id.startsWith('roster-'));
+
+  const renderCard = (c: CombatantDisplay, readOnly = false) => {
+    const hp = readOnly ? c.character.maxHp : c.currentHp;
+    const pct = getHealthPercentage(hp, c.character.maxHp);
+    const isUnconscious = hp === 0;
+
+    return (
+      <div
+        key={c.id}
+        className={`bg-slate-800 border rounded-lg p-6 transition-all ${
+          isUnconscious ? 'border-red-600 opacity-60' : 'border-slate-700'
+        } ${readOnly ? 'opacity-80' : 'hover:border-red-600'}`}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {typeIcon(c.character.type)}
+            <div>
+              <h4 className="text-xl font-bold text-white flex items-center gap-2">
+                {c.character.name}
+                {c.character.level && <span className="text-sm text-gray-400">Lvl {c.character.level}</span>}
+                {isUnconscious && <span className="text-red-500 text-sm">(Unconscious)</span>}
+              </h4>
+              <p className="text-sm text-gray-400">
+                AC: {c.character.armorClass} {readOnly ? '' : `| Initiative: ${c.initiative}`}
+                {c.character.notes && ` | ${c.character.notes}`}
+              </p>
+            </div>
+          </div>
+          <Heart size={24} className="text-red-600" />
+        </div>
+
+        {/* health bar */}
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-300 font-medium">Health</span>
+              <span className="text-white font-bold text-lg">{hp} / {c.character.maxHp}</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-6 overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${getHealthColor(pct)}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* controls */}
+          {readOnly ? (
+            <p className="text-center text-sm text-gray-500">Not in combat</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => updateHP(c.id, -(parseInt(hpChanges[c.id] || '1') || 1))}
+                  className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
+                >
+                  <Minus size={20} />
+                </button>
+
+                <input
+                  type="number"
+                  value={hpChanges[c.id] || ''}
+                  onChange={(e) => setHpChanges((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                  placeholder="Amount"
+                  className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
+                />
+
+                <button
+                  onClick={() => updateHP(c.id, parseInt(hpChanges[c.id] || '1') || 1)}
+                  className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
+                >
+                  <Plus size={20} />
+                </button>
+
+                <button
+                  onClick={() => setHP(c.id, c.character.maxHp)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
+                >
+                  Full Heal
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setHP(c.id, Math.floor(c.character.maxHp / 2))}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+                >
+                  50% HP
+                </button>
+                <button
+                  onClick={() => setHP(c.id, 0)}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
+                >
+                  Down (0 HP)
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-4">
-      {combatants.length === 0 ? (
+    <div className="space-y-6">
+      {activeList.length === 0 && rosterList.length === 0 && (
         <div className="bg-slate-800 border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400">No combatants yet. Add some from the Initiative Tracker tab!</p>
+          <p className="text-gray-400">No characters in this campaign yet.</p>
         </div>
-      ) : (
-        combatants.map((combatant) => {
-          const healthPercentage = getHealthPercentage(combatant.currentHp, combatant.character.maxHp);
-          const isUnconscious = combatant.currentHp === 0;
+      )}
 
-          return (
-            <div
-              key={combatant.id}
-              className={`bg-slate-800 border rounded-lg p-6 transition-all ${
-                isUnconscious ? 'border-red-600 opacity-60' : 'border-slate-700 hover:border-red-600'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {getTypeIcon(combatant.character.type)}
-                  <div>
-                    <h4 className="text-xl font-bold text-white flex items-center gap-2">
-                      {combatant.character.name}
-                      {combatant.character.level && (
-                        <span className="text-sm text-gray-400">Lvl {combatant.character.level}</span>
-                      )}
-                      {isUnconscious && <span className="text-red-500 text-sm">(Unconscious)</span>}
-                    </h4>
-                    <p className="text-sm text-gray-400">
-                      AC: {combatant.character.armorClass} | Initiative: {combatant.initiative}
-                      {combatant.character.notes && ` | ${combatant.character.notes}`}
-                    </p>
-                  </div>
-                </div>
-                <Heart size={24} className="text-red-600" />
-              </div>
+      {activeList.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-white mb-3">Active Combatants</h3>
+          <div className="space-y-4">{activeList.map((c) => renderCard(c))}</div>
+        </section>
+      )}
 
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-300 font-medium">Health</span>
-                    <span className="text-white font-bold text-lg">
-                      {combatant.currentHp} / {combatant.character.maxHp}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-700 rounded-full h-6 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-300 ${getHealthColor(healthPercentage)}`}
-                      style={{ width: `${healthPercentage}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const change = parseInt(hpChanges[combatant.id] || '1');
-                      updateHP(combatant.id, -change);
-                    }}
-                    className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
-                    aria-label="Decrease HP"
-                  >
-                    <Minus size={20} />
-                  </button>
-
-                  <input
-                    type="number"
-                    value={hpChanges[combatant.id] || ''}
-                    onChange={(e) => setHpChanges({ ...hpChanges, [combatant.id]: e.target.value })}
-                    placeholder="Amount"
-                    className="flex-1 bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600 text-center"
-                  />
-
-                  <button
-                    onClick={() => {
-                      const change = parseInt(hpChanges[combatant.id] || '1');
-                      updateHP(combatant.id, change);
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition-colors"
-                    aria-label="Increase HP"
-                  >
-                    <Plus size={20} />
-                  </button>
-
-                  <button
-                    onClick={() => setHP(combatant.id, combatant.character.maxHp)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
-                  >
-                    Full Heal
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setHP(combatant.id, Math.floor(combatant.character.maxHp / 2))}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-                  >
-                    50% HP
-                  </button>
-                  <button
-                    onClick={() => setHP(combatant.id, 0)}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded transition-colors text-sm"
-                  >
-                    Down (0 HP)
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })
+      {rosterList.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-white mb-3">Roster</h3>
+          <div className="space-y-4">{rosterList.map((c) => renderCard(c, true))}</div>
+        </section>
       )}
     </div>
   );
