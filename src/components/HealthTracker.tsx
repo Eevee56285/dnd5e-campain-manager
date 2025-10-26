@@ -28,6 +28,11 @@ const CONDITIONS = [
   { name: 'Restrained', emoji: '🔗' },
   { name: 'Stunned', emoji: '⚡' },
   { name: 'Exhaustion', emoji: '😩' },
+  { name: 'Exhaustion 2', emoji: '😩' },
+  { name: 'Exhaustion 3', emoji: '😩' },
+  { name: 'Exhaustion 4', emoji: '😩' },
+  { name: 'Exhaustion 5', emoji: '😩' },
+  { name: 'Exhaustion 6', emoji: '😩' },
 ];
 
 const HEALTH_KEY = (id: string) => `dnd_health_${id}`;
