@@ -117,7 +117,7 @@ export function CharacterLibrary() {
     URL.revokeObjectURL(url);
   };
 
-  /* ------------- edit ------------- */
+  /* ------------- edit (pre-fill form) ------------- */
   const handleEdit = (character: Character & Record<string, any>) => {
     setFormData({
       ...EMPTY_5E_SHEET,
@@ -226,9 +226,7 @@ export function CharacterLibrary() {
         const arr = JSON.parse(reader.result as string);
         if (!Array.isArray(arr)) throw new Error('JSON is not an array');
         arr.forEach((raw: any) => {
-          // ensure at least a name
           if (!raw.name) return;
-          // force type if missing
           const typed: any = { ...raw, type: raw.type || 'monster' };
           storage.addCharacter(typed);
         });
@@ -238,7 +236,7 @@ export function CharacterLibrary() {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // reset so same file can be re-picked
+    e.target.value = '';
   };
 
   /* ---------- big form ---------- */
