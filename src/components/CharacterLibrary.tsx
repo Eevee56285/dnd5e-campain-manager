@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { storage, type Character } from '../lib/storage';
-import { Plus, Edit2, Trash2, User, Users, Skull, X, Save, Download, Upload } from 'lucide-react';
+import { Plus, Edit2, Trash2, User, Users, Skull, X, Save, Download, UploadCloud } from 'lucide-react';
 
 /* ---------- 5e field list ---------- */
 const EMPTY_5E_SHEET = {
@@ -60,9 +60,6 @@ export function CharacterLibrary() {
 
   /* form holds EVERYTHING */
   const [formData, setFormData] = useState(EMPTY_5E_SHEET);
-
-  /* --------- import file --------- */
-  const [importType, setImportType] = useState<'player' | 'npc' | 'monster'>('player');
 
   useEffect(() => {
     loadCharacters();
@@ -219,41 +216,29 @@ export function CharacterLibrary() {
     monster: characters.filter(c => c.type === 'monster'),
   };
 
-  /* ---------- file importer ---------- */
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  /* ---------- JSON IMPORT ---------- */
+  const handleJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        let parsed: any = {};
-        if (file.name.endsWith('.json')) {
-          parsed = JSON.parse(reader.result as string);
-        } else { // .txt  (very small parser)
-          const lines = (reader.result as string).split('\n').map(l => l.trim()).filter(Boolean);
-          parsed.name = lines[0]?.replace(/^===\s*|\s*===$/g, '') || 'Imported';
-          lines.forEach(l => {
-            if (l.startsWith('Race:')) parsed.race = l.split(':')[1]?.split('|')[0]?.trim();
-            if (l.startsWith('Class:')) parsed.class = l.split(':')[1]?.trim();
-            if (l.startsWith('Level:')) parsed.level = l.split(':')[1]?.split('|')[0]?.trim();
-            if (l.startsWith('HP:')) parsed.maxHp = Number(l.split(':')[1]?.split('|')[0]?.trim());
-            if (l.startsWith('AC:')) parsed.armorClass = Number(l.split(':')[1]?.split('|')[0]?.trim());
-            if (l.startsWith('Speed:')) parsed.speed = Number(l.split(':')[1]?.trim());
-            if (l.startsWith('Initiative:')) parsed.initiativeBonus = Number(l.split(':')[1]?.trim());
-            if (l.includes('(mod')) { // ability line
-              const [abbr, rest] = l.split(':');
-              const score = Number(rest?.split('(')[0]?.trim());
-              if (!isNaN(score)) (parsed as any)[abbr.toLowerCase()] = score;
-            }
-          });
-        }
-        // force the selected type
-        const final: any = { ...parsed, type: importType };
-        storage.addCharacter(final);
+        const arr = JSON.parse(reader.result as string);
+        if (!Array.isArray(arr)) throw new Error('JSON is not an array');
+        arr.forEach((raw: any) => {
+          // ensure at least a name
+          if (!raw.name) return;
+          // force type if missing
+          const typed: any = { ...raw, type: raw.type || 'monster' };
+          storage.addCharacter(typed);
+        });
         loadCharacters();
-      } catch (err) { alert('Could not read file.\n' + err); }
+      } catch (err) {
+        alert('Invalid JSON file.\n' + err);
+      }
     };
     reader.readAsText(file);
-    e.target.value = ''; // reset input so same file can be re-picked
+    e.target.value = ''; // reset so same file can be re-picked
   };
 
   /* ---------- big form ---------- */
@@ -270,23 +255,12 @@ export function CharacterLibrary() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-bold text-white">Character Library</h2>
         <div className="flex items-center gap-3">
-          {/* ---------- IMPORT BLOCK ---------- */}
-          <div className="flex items-center gap-2">
-            <select
-              value={importType}
-              onChange={(e) => setImportType(e.target.value as any)}
-              className="bg-slate-700 border border-slate-600 text-white rounded px-2 py-1 text-sm"
-            >
-              <option value="player">Player</option>
-              <option value="npc">NPC</option>
-              <option value="monster">Monster</option>
-            </select>
-            <label className="cursor-pointer bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded flex items-center gap-2 text-sm transition-colors">
-              <Upload size={16} />
-              Import .txt / .json
-              <input type="file" accept=".txt,.json" onChange={handleFile} className="hidden" />
-            </label>
-          </div>
+          {/* ---------- IMPORT JSON ---------- */}
+          <label className="cursor-pointer bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center gap-2 text-sm transition-colors">
+            <UploadCloud size={16} />
+            Import JSON
+            <input type="file" accept=".json" onChange={handleJsonFile} className="hidden" />
+          </label>
 
           <button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors">
             <Plus size={20} /> Add Character
