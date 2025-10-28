@@ -270,7 +270,11 @@ export function CharacterLibrary() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Object.keys(formData.skills).map(s => (
                 <label key={s} className="flex items-center gap-2 text-white cursor-pointer">
-                  <input type="checkbox" checked={formData.skills[s]} onChange={e => setFormData({ ...formData, skills: { ...formData.skills, [s]: e.target.checked } } } />
+                  <input
+                    type="checkbox"
+                    checked={formData.skills[s]}
+                    onChange={e => setFormData({ ...formData, skills: { ...formData.skills, [s]: e.target.checked } })}
+                  />
                   {s}
                 </label>
               ))}
