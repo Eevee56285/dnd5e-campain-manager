@@ -87,7 +87,7 @@ export function CharacterLibrary() {
     lines.push('ABILITY SCORES');
     ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(ab => {
       const score = (ch as any)[ab] || '-';
-      const mod = Math.floor((parseInt(score as string) || 10 - 10) / 2);
+      const mod = Math.floor(((parseInt(score as string) || 10) - 10) / 2);
       lines.push(`${ab.toUpperCase()}: ${score}  (mod ${mod >= 0 ? '+' : ''}${mod})`);
     });
     lines.push('');
